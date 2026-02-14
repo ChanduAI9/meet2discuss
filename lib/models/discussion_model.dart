@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Discussion {
   final String id;
   final String hostId;
@@ -40,7 +38,7 @@ class Discussion {
     return 'upcoming';
   }
 
-  // Convert to Firestore document
+  // Convert to Realtime Database document
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -48,27 +46,31 @@ class Discussion {
       'title': title,
       'description': description,
       'location': location,
-      'dateTime': Timestamp.fromDate(dateTime),
+      'dateTime': dateTime.toIso8601String(),
       'maxParticipants': maxParticipants,
       'participants': participants,
       'status': currentStatus,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
-  // Create from Firestore document
-  factory Discussion.fromMap(Map<String, dynamic> map, String documentId) {
+  // Create from Realtime Database document
+  factory Discussion.fromMap(Map<dynamic, dynamic> map, String documentId) {
     return Discussion(
       id: documentId,
       hostId: map['hostId'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       location: map['location'] ?? '',
-      dateTime: (map['dateTime'] as Timestamp).toDate(),
+      dateTime: map['dateTime'] != null
+          ? DateTime.parse(map['dateTime'])
+          : DateTime.now(),
       maxParticipants: map['maxParticipants'] ?? 10,
       participants: List<String>.from(map['participants'] ?? []),
       status: map['status'] ?? 'upcoming',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.now(),
     );
   }
 

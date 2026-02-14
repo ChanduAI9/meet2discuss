@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
   final String uid;
   final String name;
@@ -50,7 +48,7 @@ class UserModel {
   String get reputationDisplay =>
       shouldShowReputation ? reputationScore.toStringAsFixed(1) : 'New Member';
 
-  // Convert to Firestore document
+  // Convert to Realtime Database document
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
@@ -65,12 +63,12 @@ class UserModel {
       'discussionsHosted': discussionsHosted,
       'discussionsAttended': discussionsAttended,
       'level': calculatedLevel,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
-  // Create from Firestore document
-  factory UserModel.fromMap(Map<String, dynamic> map) {
+  // Create from Realtime Database document
+  factory UserModel.fromMap(Map<dynamic, dynamic> map) {
     return UserModel(
       uid: map['uid'] ?? '',
       name: map['name'] ?? '',
@@ -84,7 +82,9 @@ class UserModel {
       discussionsHosted: map['discussionsHosted'] ?? 0,
       discussionsAttended: map['discussionsAttended'] ?? 0,
       level: map['level'],
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.now(),
     );
   }
 

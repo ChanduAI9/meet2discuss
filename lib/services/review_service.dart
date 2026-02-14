@@ -1,9 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../models/review_model.dart';
 import 'user_service.dart';
 
 class ReviewService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final DatabaseReference _reviewsRef =
+      FirebaseDatabase.instance.ref().child('reviews');
   final UserService _userService = UserService();
 
   // Submit a review
@@ -15,27 +16,28 @@ class ReviewService {
   }) async {
     try {
       // Check if review already exists
-      QuerySnapshot existingReview = await _firestore
-          .collection('reviews')
-          .where('discussionId', isEqualTo: discussionId)
-          .where('fromUserId', isEqualTo: fromUserId)
-          .where('toUserId', isEqualTo: toUserId)
-          .get();
+      final existingReview = await hasReviewed(
+        discussionId: discussionId,
+        fromUserId: fromUserId,
+        toUserId: toUserId,
+      );
 
-      if (existingReview.docs.isNotEmpty) {
+      if (existingReview) {
         throw 'You have already reviewed this participant';
       }
 
       // Create review
-      DocumentReference docRef = await _firestore.collection('reviews').add({
+      final newReviewRef = _reviewsRef.push();
+      final review = {
+        'id': newReviewRef.key!,
         'discussionId': discussionId,
         'fromUserId': fromUserId,
         'toUserId': toUserId,
         'rating': rating,
-        'createdAt': Timestamp.now(),
-      });
+        'createdAt': DateTime.now().toIso8601String(),
+      };
 
-      await docRef.update({'id': docRef.id});
+      await newReviewRef.set(review);
 
       // Update recipient's reputation score
       await _updateUserReputation(toUserId);
@@ -51,14 +53,25 @@ class ReviewService {
     required String toUserId,
   }) async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('reviews')
-          .where('discussionId', isEqualTo: discussionId)
-          .where('fromUserId', isEqualTo: fromUserId)
-          .where('toUserId', isEqualTo: toUserId)
+      final snapshot = await _reviewsRef
+          .orderByChild('discussionId')
+          .equalTo(discussionId)
           .get();
 
-      return snapshot.docs.isNotEmpty;
+      if (!snapshot.exists) {
+        return false;
+      }
+
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      for (var entry in data.entries) {
+        final review = entry.value as Map<dynamic, dynamic>;
+        if (review['fromUserId'] == fromUserId &&
+            review['toUserId'] == toUserId) {
+          return true;
+        }
+      }
+
+      return false;
     } catch (e) {
       return false;
     }
@@ -67,14 +80,22 @@ class ReviewService {
   // Get all reviews for a user
   Future<List<Review>> getUserReviews(String userId) async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('reviews')
-          .where('toUserId', isEqualTo: userId)
+      final snapshot = await _reviewsRef
+          .orderByChild('toUserId')
+          .equalTo(userId)
           .get();
 
-      return snapshot.docs
-          .map((doc) => Review.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
+      if (!snapshot.exists) {
+        return [];
+      }
+
+      final reviews = <Review>[];
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        reviews.add(Review.fromMap(value as Map<dynamic, dynamic>, key));
+      });
+
+      return reviews;
     } catch (e) {
       throw e.toString();
     }
@@ -112,15 +133,25 @@ class ReviewService {
     required String fromUserId,
   }) async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('reviews')
-          .where('discussionId', isEqualTo: discussionId)
-          .where('fromUserId', isEqualTo: fromUserId)
+      final snapshot = await _reviewsRef
+          .orderByChild('discussionId')
+          .equalTo(discussionId)
           .get();
 
-      return snapshot.docs
-          .map((doc) => Review.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
+      if (!snapshot.exists) {
+        return [];
+      }
+
+      final reviews = <Review>[];
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        final review = value as Map<dynamic, dynamic>;
+        if (review['fromUserId'] == fromUserId) {
+          reviews.add(Review.fromMap(review, key));
+        }
+      });
+
+      return reviews;
     } catch (e) {
       throw e.toString();
     }

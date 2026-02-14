@@ -45,10 +45,7 @@ class DiscussionService {
         Map<dynamic, dynamic> values = event.snapshot.value as Map<dynamic, dynamic>;
         values.forEach((key, value) {
           try {
-            Discussion discussion = Discussion.fromMap(
-              Map<dynamic, dynamic>.from(value),
-              key.toString(),
-            );
+            Discussion discussion = Discussion.fromMap(Map<String, dynamic>.from(value));
             // Filter by city if provided
             if (city == null || city.isEmpty || 
                 discussion.location.toLowerCase().contains(city.toLowerCase())) {
@@ -65,35 +62,12 @@ class DiscussionService {
     });
   }
 
-  // Get upcoming discussions stream
-  Stream<List<Discussion>> getUpcomingDiscussions({String? city}) {
-    return getDiscussionsStream(city: city).map((discussions) {
-      return discussions.where((d) => d.status == 'upcoming').toList();
-    });
-  }
-
-  // Get single discussion stream
-  Stream<Discussion?> getDiscussionStream(String discussionId) {
-    return _database.child('discussions').child(discussionId).onValue.map((event) {
-      if (event.snapshot.exists) {
-        return Discussion.fromMap(
-          Map<dynamic, dynamic>.from(event.snapshot.value as Map),
-          discussionId,
-        );
-      }
-      return null;
-    });
-  }
-
   // Get discussion by ID
   Future<Discussion?> getDiscussionById(String discussionId) async {
     try {
       DataSnapshot snapshot = await _database.child('discussions').child(discussionId).get();
       if (snapshot.exists) {
-        return Discussion.fromMap(
-          Map<dynamic, dynamic>.from(snapshot.value as Map),
-          discussionId,
-        );
+        return Discussion.fromMap(Map<String, dynamic>.from(snapshot.value as Map));
       }
       return null;
     } catch (e) {
