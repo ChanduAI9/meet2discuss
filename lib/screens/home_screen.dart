@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'create_discussion_screen.dart';
-import 'discussion_details_screen.dart';
-import 'profile_screen.dart';
+import 'package:intl/intl.dart';
+import '../models/discussion_model.dart';
+import '../services/discussion_service.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,7 +12,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String selectedLocation = 'Hyderabad';
+  final _discussionService = DiscussionService();
+  final _authService = AuthService();
+  String _selectedCity = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,13 +35,14 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.location_on, color: Color(0xFF2563EB)),
             const SizedBox(width: 8),
             DropdownButton<String>(
-              value: selectedLocation,
+              value: _selectedCity.isEmpty ? null : _selectedCity,
+              hint: const Text('All Cities'),
               underline: const SizedBox(),
-              items: ['Hyderabad', 'Bangalore', 'Mumbai', 'Delhi']
-                  .map((location) => DropdownMenuItem(
-                        value: location,
+              items: ['All Cities', 'Hyderabad', 'Bangalore', 'Mumbai', 'Delhi', 'Pune']
+                  .map((city) => DropdownMenuItem(
+                        value: city == 'All Cities' ? '' : city,
                         child: Text(
-                          location,
+                          city,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -42,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   .toList(),
               onChanged: (value) {
                 setState(() {
-                  selectedLocation = value!;
+                  _selectedCity = value ?? '';
                 });
               },
             ),
@@ -52,12 +63,20 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.person_outline, color: Colors.black87),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfileScreen(),
-                ),
-              );
+              if (_authService.currentUser != null) {
+                Navigator.pushNamed(context, '/profile');
+              } else {
+                Navigator.pushNamed(context, '/login');
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_outlined, color: Colors.black87),
+            onPressed: () async {
+              await _authService.signOut();
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, '/');
+              }
             },
           ),
         ],
@@ -68,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search discussions...',
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
@@ -79,30 +99,81 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
+              onChanged: (value) => setState(() {}),
             ),
           ),
           // Discussion List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                return DiscussionCard(
-                  title: _getTitles()[index % _getTitles().length],
-                  description: 'Let\'s discuss and share our thoughts on this topic',
-                  date: 'Feb 15, 2026',
-                  time: '6:00 PM',
-                  location: 'Inorbit Mall, ${selectedLocation}',
-                  participantsCount: 5 + index,
-                  maxParticipants: 10,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DiscussionDetailsScreen(
-                          title: _getTitles()[index % _getTitles().length],
+            child: StreamBuilder<List<Discussion>>(
+              stream: _discussionService.getUpcomingDiscussions(
+                city: _selectedCity.isEmpty ? null : _selectedCity,
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                List<Discussion> discussions = snapshot.data ?? [];
+
+                // Filter by search
+                if (_searchController.text.isNotEmpty) {
+                  discussions = discussions.where((d) {
+                    return d.title.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                           d.description.toLowerCase().contains(_searchController.text.toLowerCase());
+                  }).toList();
+                }
+
+                if (discussions.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.forum_outlined,
+                          size: 80,
+                          color: Colors.grey.shade300,
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No discussions found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Be the first to create one!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: discussions.length,
+                  itemBuilder: (context, index) {
+                    Discussion discussion = discussions[index];
+                    return _DiscussionCard(
+                      discussion: discussion,
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/discussion-details',
+                          arguments: discussion.id,
+                        );
+                      },
                     );
                   },
                 );
@@ -111,89 +182,74 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CreateDiscussionScreen(),
-            ),
-          );
+          if (_authService.currentUser != null) {
+            Navigator.pushNamed(context, '/create-discussion');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please login to create a discussion'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            Navigator.pushNamed(context, '/login');
+          }
         },
-        backgroundColor: const Color(0xFF2563EB),
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: const Color(0xFF22C55E),
+        icon: const Icon(Icons.add),
+        label: const Text(
+          'Create',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
-
-  List<String> _getTitles() {
-    return [
-      'AI & Future of Work',
-      'Climate Change Solutions',
-      'Startup Ecosystem',
-      'Mental Health Awareness',
-      'Tech Trends 2026',
-      'Book Club: Philosophy',
-      'Fitness & Wellness',
-      'Travel Stories',
-      'Photography Tips',
-      'Cooking & Recipes',
-    ];
-  }
 }
 
-class DiscussionCard extends StatelessWidget {
-  final String title;
-  final String description;
-  final String date;
-  final String time;
-  final String location;
-  final int participantsCount;
-  final int maxParticipants;
+class _DiscussionCard extends StatelessWidget {
+  final Discussion discussion;
   final VoidCallback onTap;
 
-  const DiscussionCard({
-    super.key,
-    required this.title,
-    required this.description,
-    required this.date,
-    required this.time,
-    required this.location,
-    required this.participantsCount,
-    required this.maxParticipants,
+  const _DiscussionCard({
+    required this.discussion,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final timeFormat = DateFormat('h:mm a');
+
     return Card(
+      elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Title
               Text(
-                title,
+                discussion.title,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 8),
               // Description
               Text(
-                description,
+                discussion.description,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade600,
@@ -202,13 +258,23 @@ class DiscussionCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 12),
-              // Date & Time
+              // Date and Time
               Row(
                 children: [
                   Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
                   const SizedBox(width: 4),
                   Text(
-                    '$date • $time',
+                    dateFormat.format(discussion.dateTime),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    timeFormat.format(discussion.dateTime),
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade600,
@@ -224,46 +290,52 @@ class DiscussionCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      location,
+                      discussion.location,
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.grey.shade600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              // Participants & Join Button
+              // Participants and Join Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.people, size: 16, color: Colors.grey.shade600),
+                      Icon(Icons.people, size: 18, color: Colors.grey.shade700),
                       const SizedBox(width: 4),
                       Text(
-                        '$participantsCount/$maxParticipants joined',
+                        '${discussion.participants.length}/${discussion.maxParticipants} participants',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
                         ),
                       ),
                     ],
                   ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      elevation: 0,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: discussion.isFull
+                          ? Colors.grey.shade300
+                          : const Color(0xFF2563EB),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('Join'),
+                    child: Text(
+                      discussion.isFull ? 'Full' : 'View',
+                      style: TextStyle(
+                        color: discussion.isFull ? Colors.grey.shade700 : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ],
               ),

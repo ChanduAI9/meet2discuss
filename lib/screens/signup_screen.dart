@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -13,18 +14,70 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _professionalRoleController = TextEditingController();
+  final _expertiseController = TextEditingController();
+  final _yearsController = TextEditingController();
+  final _authService = AuthService();
+  
   bool _isPasswordVisible = false;
-  bool _isConfirmPasswordVisible = false;
-  bool _acceptTerms = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _professionalRoleController.dispose();
+    _expertiseController.dispose();
+    _yearsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Parse expertise (comma-separated)
+      List<String> expertiseList = _expertiseController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      await _authService.signUpWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+        professionalRole: _professionalRoleController.text.trim(),
+        expertise: expertiseList,
+        yearsOfExperience: int.parse(_yearsController.text),
+      );
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleGoogleSignup() async {
+    // Show dialog to collect additional info for Google signup
+    showDialog(
+      context: context,
+      builder: (context) => _GoogleSignupDialog(authService: _authService),
+    );
   }
 
   @override
@@ -48,24 +101,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                // Title
                 const Text(
                   'Create Account',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign up to get started',
+                  'Join the discussion community',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
+                
                 // Name Field
                 TextFormField(
                   controller: _nameController,
@@ -82,7 +135,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepPurple, width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
                     ),
                   ),
                   validator: (value) {
@@ -92,7 +145,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                
                 // Email Field
                 TextFormField(
                   controller: _emailController,
@@ -110,7 +164,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepPurple, width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
                     ),
                   ),
                   validator: (value) {
@@ -123,20 +177,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                
                 // Password Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    hintText: 'Create a password',
+                    hintText: 'Enter your password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                        _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -153,12 +206,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepPurple, width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
                     ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
+                      return 'Please enter your password';
                     }
                     if (value.length < 6) {
                       return 'Password must be at least 6 characters';
@@ -166,27 +219,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 20),
-                // Confirm Password Field
+                const SizedBox(height: 16),
+                
+                // Professional Role Field
                 TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: !_isConfirmPasswordVisible,
+                  controller: _professionalRoleController,
                   decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    hintText: 'Re-enter your password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isConfirmPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                        });
-                      },
-                    ),
+                    labelText: 'Professional Role',
+                    hintText: 'e.g., Software Engineer, Teacher',
+                    prefixIcon: const Icon(Icons.work_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -196,105 +237,114 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepPurple, width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
                     ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please confirm your password';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return 'Please enter your professional role';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                // Terms & Conditions
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _acceptTerms,
-                      onChanged: (value) {
-                        setState(() {
-                          _acceptTerms = value ?? false;
-                        });
-                      },
-                      activeColor: Colors.deepPurple,
+                
+                // Expertise Field
+                TextFormField(
+                  controller: _expertiseController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Expertise',
+                    hintText: 'e.g., AI, Philosophy, Economics (comma-separated)',
+                    prefixIcon: const Icon(Icons.lightbulb_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    Expanded(
-                      child: Wrap(
-                        children: [
-                          const Text('I agree to the '),
-                          GestureDetector(
-                            onTap: () {
-                              // TODO: Show terms
-                            },
-                            child: const Text(
-                              'Terms & Conditions',
-                              style: TextStyle(
-                                color: Colors.deepPurple,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                  ],
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter at least one area of expertise';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // Years of Experience Field
+                TextFormField(
+                  controller: _yearsController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Years of Experience',
+                    hintText: 'Enter years',
+                    prefixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter years of experience';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Please enter a valid number';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
+                
                 // Sign Up Button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        if (!_acceptTerms) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please accept terms & conditions'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-                        // TODO: Implement sign up logic
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Account created successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    },
+                    onPressed: _isLoading ? null : _handleSignup,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
+                      backgroundColor: const Color(0xFF22C55E),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Divider with "or"
+                
+                // Divider
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.grey.shade300)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'or sign up with',
+                        'OR',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
@@ -302,31 +352,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Social Sign Up Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SocialButton(
-                        icon: Icons.g_mobiledata,
-                        label: 'Google',
-                        onPressed: () {
-                          // TODO: Implement Google sign up
-                        },
+                
+                // Google Sign Up Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _handleGoogleSignup,
+                    icon: const Icon(Icons.g_mobiledata, size: 28),
+                    label: const Text(
+                      'Sign up with Google',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _SocialButton(
-                        icon: Icons.facebook,
-                        label: 'Facebook',
-                        onPressed: () {
-                          // TODO: Implement Facebook sign up
-                        },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: BorderSide(color: Colors.grey.shade300, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                
                 // Login Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -337,17 +388,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        Navigator.pushReplacementNamed(context, '/login');
                       },
                       child: const Text(
                         'Login',
                         style: TextStyle(
-                          color: Colors.deepPurple,
+                          color: Color(0xFF2563EB),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -363,31 +409,148 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-class _SocialButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
+// Dialog for Google Sign-up to collect additional info
+class _GoogleSignupDialog extends StatefulWidget {
+  final AuthService authService;
 
-  const _SocialButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
+  const _GoogleSignupDialog({required this.authService});
+
+  @override
+  State<_GoogleSignupDialog> createState() => _GoogleSignupDialogState();
+}
+
+class _GoogleSignupDialogState extends State<_GoogleSignupDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _professionalRoleController = TextEditingController();
+  final _expertiseController = TextEditingController();
+  final _yearsController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _professionalRoleController.dispose();
+    _expertiseController.dispose();
+    _yearsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleGoogleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      List<String> expertiseList = _expertiseController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      UserCredential? result = await widget.authService.signInWithGoogle(
+        professionalRole: _professionalRoleController.text.trim(),
+        expertise: expertiseList,
+        yearsOfExperience: int.parse(_yearsController.text),
+      );
+
+      if (result != null && mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.black87,
-        side: BorderSide(color: Colors.grey.shade300),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+    return AlertDialog(
+      title: const Text('Complete Your Profile'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _professionalRoleController,
+                decoration: const InputDecoration(
+                  labelText: 'Professional Role',
+                  hintText: 'e.g., Software Engineer',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _expertiseController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Expertise',
+                  hintText: 'e.g., AI, Philosophy',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _yearsController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Years of Experience',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 12),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _handleGoogleSignup,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF22C55E),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Continue'),
+        ),
+      ],
     );
   }
 }
