@@ -43,20 +43,22 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDEMO-DEMO-DEMO-DEMO-DEMO-DEMO',
-    appId: '1:123456789:web:abcdef123456',
-    messagingSenderId: '123456789',
-    projectId: 'meet2discuss-demo',
-    authDomain: 'meet2discuss-demo.firebaseapp.com',
-    storageBucket: 'meet2discuss-demo.appspot.com',
+    apiKey: 'AIzaSyDYT505sMOsnH7YPVBxilGtffXFakKdGj4',
+    appId: '1:14924879038:web:d75bec5e7836bd5e6ffaef',
+    messagingSenderId: '14924879038',
+    projectId: 'meet2discuss',
+    authDomain: 'meet2discuss.firebaseapp.com',
+    databaseURL: 'https://meet2discuss-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'meet2discuss.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDEMO-DEMO-DEMO-DEMO-DEMO-DEMO',
-    appId: '1:123456789:android:abcdef123456',
-    messagingSenderId: '123456789',
-    projectId: 'meet2discuss-demo',
-    storageBucket: 'meet2discuss-demo.appspot.com',
+    apiKey: 'AIzaSyDYT505sMOsnH7YPVBxilGtffXFakKdGj4',
+    appId: '1:14924879038:android:abcdef123456',
+    messagingSenderId: '14924879038',
+    projectId: 'meet2discuss',
+    databaseURL: 'https://meet2discuss-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'meet2discuss.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

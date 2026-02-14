@@ -1,12 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn? _googleSignIn = _initializeGoogleSignIn();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
 
   // Initialize Google Sign-In safely
   static GoogleSignIn? _initializeGoogleSignIn() {
@@ -40,7 +40,7 @@ class AuthService {
         password: password,
       );
 
-      // Create user profile in Firestore
+      // Create user profile in Realtime Database
       if (userCredential.user != null) {
         UserModel userModel = UserModel(
           uid: userCredential.user!.uid,
@@ -51,9 +51,9 @@ class AuthService {
           yearsOfExperience: yearsOfExperience,
         );
 
-        await _firestore
-            .collection('users')
-            .doc(userCredential.user!.uid)
+        await _database
+            .child('users')
+            .child(userCredential.user!.uid)
             .set(userModel.toMap());
       }
 
@@ -110,12 +110,12 @@ class AuthService {
 
       // Check if user profile exists, if not create one
       if (userCredential.user != null) {
-        DocumentSnapshot userDoc = await _firestore
-            .collection('users')
-            .doc(userCredential.user!.uid)
+        DataSnapshot userSnapshot = await _database
+            .child('users')
+            .child(userCredential.user!.uid)
             .get();
 
-        if (!userDoc.exists && name != null && professionalRole != null) {
+        if (!userSnapshot.exists && name != null && professionalRole != null) {
           // Create new user profile
           UserModel userModel = UserModel(
             uid: userCredential.user!.uid,
@@ -127,9 +127,9 @@ class AuthService {
             yearsOfExperience: yearsOfExperience ?? 0,
           );
 
-          await _firestore
-              .collection('users')
-              .doc(userCredential.user!.uid)
+          await _database
+              .child('users')
+              .child(userCredential.user!.uid)
               .set(userModel.toMap());
         }
       }

@@ -60,10 +60,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString();
+        
+        // Show helpful message for Firebase configuration issues
+        if (errorMessage.contains('API key') || 
+            errorMessage.contains('invalid') || 
+            errorMessage.contains('INVALID_API_KEY')) {
+          errorMessage = 'Firebase is not configured properly.\n\n'
+              'This is a DEMO app. To use authentication features:\n'
+              '1. Set up a Firebase project\n'
+              '2. Follow FIREBASE_SETUP.md instructions\n'
+              '3. Replace demo config in firebase_options.dart';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
+            content: Text(errorMessage),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
