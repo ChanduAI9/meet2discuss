@@ -73,6 +73,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _handleGoogleSignup() async {
+    // Check if Google Sign-In is available
+    if (!_authService.isGoogleSignInAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google Sign-In is not configured. Please use email/password signup.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
     // Show dialog to collect additional info for Google signup
     showDialog(
       context: context,

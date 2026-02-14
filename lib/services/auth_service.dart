@@ -5,8 +5,18 @@ import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn? _googleSignIn = _initializeGoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Initialize Google Sign-In safely
+  static GoogleSignIn? _initializeGoogleSignIn() {
+    try {
+      return GoogleSignIn();
+    } catch (e) {
+      print('⚠️ Google Sign-In not configured: $e');
+      return null;
+    }
+  }
 
   // Get current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -77,8 +87,13 @@ class AuthService {
     int? yearsOfExperience,
   }) async {
     try {
+      // Check if Google Sign-In is available
+      if (_googleSignIn == null) {
+        throw Exception('Google Sign-In is not configured. Please use email/password authentication.');
+      }
+
       // Trigger Google Sign-In flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
       if (googleUser == null) return null;
 
       // Obtain auth details
@@ -127,7 +142,12 @@ class AuthService {
 
   // Sign out
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    if (_googleSignIn != null) {
+      await _googleSignIn!.signOut();
+    }
     await _auth.signOut();
   }
+
+  // Check if Google Sign-In is available
+  bool get isGoogleSignInAvailable => _googleSignIn != null;
 }
